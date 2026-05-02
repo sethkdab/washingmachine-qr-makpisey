@@ -256,6 +256,7 @@ ADMIN_PANEL_TEMPLATE = """
     button.alt { background: #475569; }
     button.danger { background: #b91c1c; }
     input[type="number"] { width: 80px; border-radius: 10px; border: 1px solid #475569; background: #0f172a; color: white; padding: 10px; }
+    input[type="text"] { width: min(420px, 100%); border-radius: 10px; border: 1px solid #475569; background: #0f172a; color: white; padding: 10px; }
     .log { font-family: Consolas, monospace; white-space: pre-wrap; color: #cbd5e1; font-size: 13px; }
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
     th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #334155; vertical-align: top; }
@@ -288,6 +289,7 @@ ADMIN_PANEL_TEMPLATE = """
 
     function machineCard(machine) {
       const knobId = "knob-" + machine.machine_code;
+      const priceId = "price-" + machine.machine_code;
       return `
         <div class="card">
           <h2 class="machine-title">${machine.name} <span class="pill">${machine.machine_code}</span></h2>
@@ -303,6 +305,8 @@ ADMIN_PANEL_TEMPLATE = """
             <button onclick="sendKnob('${machine.machine_code}', 'KNOB_CLOCKWISE', '${knobId}')">Knob Clockwise</button>
             <button class="alt" onclick="sendKnob('${machine.machine_code}', 'KNOB_COUNTERCLOCKWISE', '${knobId}')">Knob Counterclockwise</button>
             <label>Steps <input id="${knobId}" type="number" min="1" max="12" value="1" /></label>
+            <label>Price <input id="${priceId}" type="number" min="0.01" step="0.01" value="${machine.price}" /></label>
+            <button onclick="updatePrice('${machine.machine_code}', '${priceId}')">Save Price</button>
           </div>
         </div>
       `;
@@ -393,7 +397,18 @@ ADMIN_PANEL_TEMPLATE = """
       const response = await fetch("/admin/panel/data", { cache: "no-store" });
       const payload = await response.json();
       renderStats(payload.summary);
+      const settingsHtml = `
+        <div class="card">
+          <h3>Payment Settings</h3>
+          <div class="actions">
+            <label>ABA Pay URL Template <input id="aba-url-template" type="text" value="${payload.settings.aba_pay_url_template || ""}" /></label>
+            <button onclick="savePaymentUrl()">Save Payment URL</button>
+          </div>
+          <p class="muted">Supports placeholders like {amount}, {session_id}, and {machine_id}. Fixed links work too.</p>
+        </div>
+      `;
       machinesEl.innerHTML = payload.machines.map(machineCard).join("") + `
+        ${settingsHtml}
         <div class="card">
           <h3>Recent Commands</h3>
           <div class="log">${payload.commands.map(c => `${c.created_at}  ${c.command_type}  ${c.status}  ${c.machine_code}  ${c.session_id || '-'}`).join("\\n") || "No commands yet."}</div>
@@ -422,11 +437,41 @@ ADMIN_PANEL_TEMPLATE = """
       await sendCommand(machineCode, commandType, { steps });
     }
 
+    async function updatePrice(machineCode, priceId) {
+      const price = document.getElementById(priceId).value;
+      const response = await fetch("/admin/panel/" + machineCode + "/price", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ price_usd: price })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        alert(payload.error || "Failed to update price");
+        return;
+      }
+      await refresh();
+    }
+
     async function clearCommands() {
       const response = await fetch("/admin/panel/clear-commands", { method: "POST" });
       const payload = await response.json();
       if (!response.ok) {
         alert(payload.error || "Failed to clear commands");
+        return;
+      }
+      await refresh();
+    }
+
+    async function savePaymentUrl() {
+      const value = document.getElementById("aba-url-template").value;
+      const response = await fetch("/admin/panel/payment-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aba_pay_url_template: value })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        alert(payload.error || "Failed to save payment URL");
         return;
       }
       await refresh();
@@ -490,8 +535,23 @@ def public_url_for(machine):
     return f"{APP_BASE_URL}/m/{machine.public_token}"
 
 
+def get_setting(key, default_value=""):
+    row = AppSetting.query.filter_by(key=key).first()
+    return row.value if row else default_value
+
+
+def set_setting(key, value):
+    row = AppSetting.query.filter_by(key=key).first()
+    if row:
+        row.value = value
+    else:
+        row = AppSetting(key=key, value=value)
+        db.session.add(row)
+    return row
+
+
 def build_pay_link(machine, session):
-    template = ABA_PAY_URL_TEMPLATE
+    template = get_setting("aba_pay_url_template", ABA_PAY_URL_TEMPLATE)
     if "{" not in template:
         return template
     return template.format(
@@ -610,6 +670,13 @@ class PaymentEvent(db.Model):
     source_chat_id = db.Column(db.String(64), nullable=False)
     source_sender_id = db.Column(db.String(64), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=now_utc)
+
+
+class AppSetting(db.Model):
+    __tablename__ = "app_settings"
+
+    key = db.Column(db.String(64), primary_key=True)
+    value = db.Column(db.Text, nullable=False)
 
 
 def serialize_machine(machine):
@@ -907,11 +974,15 @@ def admin_panel_data():
         "machine_count": Machine.query.count(),
         "payment_count": PaymentEvent.query.count(),
     }
+    settings = {
+        "aba_pay_url_template": get_setting("aba_pay_url_template", ABA_PAY_URL_TEMPLATE),
+    }
 
     return jsonify(
         {
             "ok": True,
             "summary": summary,
+            "settings": settings,
             "machines": machines,
             "commands": commands,
             "sessions": sessions,
@@ -957,6 +1028,42 @@ def admin_panel_clear_commands():
     Command.query.delete()
     db.session.commit()
     return jsonify({"ok": True})
+
+
+@app.route("/admin/panel/<machine_code>/price", methods=["POST"])
+def admin_panel_update_price(machine_code):
+    auth = require_admin_panel_auth()
+    if auth:
+        return auth
+
+    machine = Machine.query.filter_by(machine_code=machine_code).first()
+    if not machine:
+        return jsonify({"ok": False, "error": "machine_not_found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    price = parse_decimal(data.get("price_usd"))
+    if price is None or price <= 0:
+        return jsonify({"ok": False, "error": "invalid_price"}), 400
+
+    machine.price_usd = price
+    db.session.commit()
+    return jsonify({"ok": True, "machine": serialize_machine(machine)})
+
+
+@app.route("/admin/panel/payment-url", methods=["POST"])
+def admin_panel_update_payment_url():
+    auth = require_admin_panel_auth()
+    if auth:
+        return auth
+
+    data = request.get_json(silent=True) or {}
+    value = str(data.get("aba_pay_url_template") or "").strip()
+    if not value:
+        return jsonify({"ok": False, "error": "payment_url_required"}), 400
+
+    set_setting("aba_pay_url_template", value)
+    db.session.commit()
+    return jsonify({"ok": True, "aba_pay_url_template": value})
 
 
 @app.route("/m/<public_token>")
