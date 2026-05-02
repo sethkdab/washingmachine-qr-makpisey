@@ -300,6 +300,7 @@ ADMIN_PANEL_TEMPLATE = """
             <div><strong>Public URL:</strong> <a href="${machine.public_url}" target="_blank" style="color:#93c5fd">${machine.public_url}</a></div>
           </div>
           <div class="actions">
+            <button class="ok" onclick="bypassPayment('${machine.machine_code}')">Bypass Payment</button>
             <button class="warn" onclick="sendCommand('${machine.machine_code}', 'POWER_HOLD')">Hold Power 2s</button>
             <button class="ok" onclick="sendCommand('${machine.machine_code}', 'START_PAUSE_HOLD')">Hold Start/Pause 2s</button>
             <button onclick="sendKnob('${machine.machine_code}', 'KNOB_CLOCKWISE', '${knobId}')">Knob Clockwise</button>
@@ -441,6 +442,18 @@ ADMIN_PANEL_TEMPLATE = """
     async function sendKnob(machineCode, commandType, knobId) {
       const steps = Number(document.getElementById(knobId).value || "1");
       await sendCommand(machineCode, commandType, { steps });
+    }
+
+    async function bypassPayment(machineCode) {
+      const response = await fetch("/admin/panel/" + machineCode + "/bypass-payment", {
+        method: "POST"
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        alert(payload.error || "Failed to bypass payment");
+        return;
+      }
+      await refresh();
     }
 
     async function updatePrice(machineCode, priceId) {
@@ -1074,6 +1087,56 @@ def admin_panel_update_payment_url():
     set_setting("aba_pay_url_template", value)
     db.session.commit()
     return jsonify({"ok": True, "aba_pay_url_template": value})
+
+
+@app.route("/admin/panel/<machine_code>/bypass-payment", methods=["POST"])
+def admin_panel_bypass_payment(machine_code):
+    auth = require_admin_panel_auth()
+    if auth:
+        return auth
+
+    cleanup_expired_sessions()
+    machine = Machine.query.filter_by(machine_code=machine_code).first()
+    if not machine:
+        return jsonify({"ok": False, "error": "machine_not_found"}), 404
+    if not machine.current_session_id:
+        return jsonify({"ok": False, "error": "no_active_session"}), 409
+
+    session = WashSession.query.filter_by(session_id=machine.current_session_id, machine_id=machine.id).first()
+    if not session:
+        return jsonify({"ok": False, "error": "active_session_not_found"}), 404
+    if session.status != SESSION_AWAITING_PAYMENT:
+        return jsonify({"ok": False, "error": "active_session_not_awaiting_payment", "session_status": session.status}), 409
+    if seconds_until(session.expires_at) <= 0:
+        session.status = SESSION_EXPIRED
+        machine.current_session_id = None
+        machine.status = MACHINE_AVAILABLE
+        db.session.commit()
+        return jsonify({"ok": False, "error": "active_session_expired"}), 409
+
+    existing_command = Command.query.filter(
+        Command.machine_id == machine.id,
+        Command.session_id == session.session_id,
+        Command.command_type == START_SERVICE,
+        Command.status.in_([COMMAND_PENDING, COMMAND_ACKED]),
+    ).first()
+
+    if existing_command is None:
+        command = queue_machine_command(
+            machine,
+            command_type=START_SERVICE,
+            session_id=session.session_id,
+            duration_minutes=machine.wash_duration_minutes,
+            steps=1,
+        )
+    else:
+        command = existing_command
+
+    session.status = SESSION_PAYMENT_CONFIRMED
+    machine.status = MACHINE_STARTING
+    db.session.commit()
+
+    return jsonify({"ok": True, "session": serialize_session(session), "command": serialize_command(command)})
 
 
 @app.route("/m/<public_token>")
