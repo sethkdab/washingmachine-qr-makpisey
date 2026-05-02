@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: bash start_render.sh
     autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
@@ -40,35 +40,11 @@ services:
         value: 30
       - key: MACHINE_OFFLINE_SECONDS
         value: 45
-
-  - type: worker
-    name: washingmachine-worker
-    runtime: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: python worker.py
-    autoDeploy: true
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.9
       - key: BACKEND_URL
         fromService:
           type: web
           name: washingmachine-web
           property: url
-      - key: DATABASE_URL
-        fromDatabase:
-          name: washingmachine-db
-          property: connectionString
-      - key: INTERNAL_API_SECRET
-        fromService:
-          type: web
-          name: washingmachine-web
-          envVarKey: INTERNAL_API_SECRET
-      - key: ABA_GROUP_ID
-        value: -1002522488273
-      - key: ABA_BOT_ID
-        value: 1148497258
       - key: GROUP_MACHINE_CODE
         value: WM-01
       - key: TG_API_ID
