@@ -418,6 +418,12 @@ ADMIN_PANEL_TEMPLATE = """
       renderPayments(payload.payments);
     }
 
+    function isEditing() {
+      const active = document.activeElement;
+      if (!active) return false;
+      return active.tagName === "INPUT" || active.tagName === "TEXTAREA";
+    }
+
     async function sendCommand(machineCode, commandType, extra = {}) {
       const response = await fetch("/admin/panel/" + machineCode + "/command", {
         method: "POST",
@@ -478,7 +484,11 @@ ADMIN_PANEL_TEMPLATE = """
     }
 
     refresh();
-    setInterval(refresh, 3000);
+    setInterval(() => {
+      if (!isEditing()) {
+        refresh();
+      }
+    }, 3000);
   </script>
 </body>
 </html>
