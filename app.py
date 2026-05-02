@@ -249,20 +249,42 @@ ADMIN_PANEL_TEMPLATE = """
     .pill { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #1e293b; font-size: 12px; font-weight: 700; text-transform: uppercase; }
     .muted { color: #94a3b8; }
     .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .topbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
     button { border: 0; border-radius: 12px; padding: 12px 14px; font-weight: 700; cursor: pointer; color: white; background: #2563eb; }
     button.warn { background: #b45309; }
     button.ok { background: #0f766e; }
     button.alt { background: #475569; }
+    button.danger { background: #b91c1c; }
     input[type="number"] { width: 80px; border-radius: 10px; border: 1px solid #475569; background: #0f172a; color: white; padding: 10px; }
     .log { font-family: Consolas, monospace; white-space: pre-wrap; color: #cbd5e1; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #334155; vertical-align: top; }
+    th { color: #94a3b8; font-size: 12px; text-transform: uppercase; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .stat-box { background: #111827; border: 1px solid #334155; border-radius: 16px; padding: 16px; }
+    .stat-label { color: #94a3b8; font-size: 12px; text-transform: uppercase; }
+    .stat-value { font-size: 28px; font-weight: 800; margin-top: 6px; }
   </style>
 </head>
 <body>
-  <h1>Washing Machine Admin Panel</h1>
-  <p class="muted">Protected with HTTP basic auth. Control buttons enqueue commands for ESP32 polling.</p>
+  <div class="topbar">
+    <div>
+      <h1>Washing Machine Admin Panel</h1>
+      <p class="muted">Protected with HTTP basic auth. Control buttons enqueue commands for ESP32 polling.</p>
+    </div>
+    <div class="actions">
+      <button class="danger" onclick="clearCommands()">Clear Recent Command Log</button>
+    </div>
+  </div>
+  <div id="stats"></div>
   <div id="machines"></div>
+  <div id="sessions"></div>
+  <div id="payments"></div>
   <script>
+    const statsEl = document.getElementById("stats");
     const machinesEl = document.getElementById("machines");
+    const sessionsEl = document.getElementById("sessions");
+    const paymentsEl = document.getElementById("payments");
 
     function machineCard(machine) {
       const knobId = "knob-" + machine.machine_code;
@@ -286,15 +308,99 @@ ADMIN_PANEL_TEMPLATE = """
       `;
     }
 
+    function money(value) {
+      return "$" + Number(value || 0).toFixed(2);
+    }
+
+    function renderStats(summary) {
+      statsEl.innerHTML = `
+        <div class="stat-grid">
+          <div class="stat-box"><div class="stat-label">Total Revenue</div><div class="stat-value">${money(summary.total_revenue)}</div></div>
+          <div class="stat-box"><div class="stat-label">Completed Sessions</div><div class="stat-value">${summary.completed_sessions}</div></div>
+          <div class="stat-box"><div class="stat-label">Awaiting Payment</div><div class="stat-value">${summary.awaiting_payment_sessions}</div></div>
+          <div class="stat-box"><div class="stat-label">Running Sessions</div><div class="stat-value">${summary.running_sessions}</div></div>
+          <div class="stat-box"><div class="stat-label">Machines</div><div class="stat-value">${summary.machine_count}</div></div>
+          <div class="stat-box"><div class="stat-label">Payment Events</div><div class="stat-value">${summary.payment_count}</div></div>
+        </div>
+      `;
+    }
+
+    function renderSessions(sessions) {
+      sessionsEl.innerHTML = `
+        <div class="card">
+          <h3>Sessions</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Session</th>
+                <th>Status</th>
+                <th>Amount</th>
+                <th>Machine</th>
+                <th>Created</th>
+                <th>Started</th>
+                <th>Completed</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sessions.map(session => `
+                <tr>
+                  <td>${session.session_id}</td>
+                  <td>${session.status}</td>
+                  <td>${money(session.expected_amount)}</td>
+                  <td>${session.machine_code || "-"}</td>
+                  <td>${session.created_at || "-"}</td>
+                  <td>${session.started_at || "-"}</td>
+                  <td>${session.completed_at || "-"}</td>
+                </tr>
+              `).join("") || `<tr><td colspan="7">No sessions yet.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderPayments(payments) {
+      paymentsEl.innerHTML = `
+        <div class="card">
+          <h3>Payments</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Trx ID</th>
+                <th>Amount</th>
+                <th>Machine</th>
+                <th>Session</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${payments.map(payment => `
+                <tr>
+                  <td>${payment.trx_id}</td>
+                  <td>${money(payment.amount)}</td>
+                  <td>${payment.machine_code}</td>
+                  <td>${payment.session_id}</td>
+                  <td>${payment.created_at || "-"}</td>
+                </tr>
+              `).join("") || `<tr><td colspan="5">No payments yet.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
     async function refresh() {
       const response = await fetch("/admin/panel/data", { cache: "no-store" });
       const payload = await response.json();
+      renderStats(payload.summary);
       machinesEl.innerHTML = payload.machines.map(machineCard).join("") + `
         <div class="card">
           <h3>Recent Commands</h3>
           <div class="log">${payload.commands.map(c => `${c.created_at}  ${c.command_type}  ${c.status}  ${c.machine_code}  ${c.session_id || '-'}`).join("\\n") || "No commands yet."}</div>
         </div>
       `;
+      renderSessions(payload.sessions);
+      renderPayments(payload.payments);
     }
 
     async function sendCommand(machineCode, commandType, extra = {}) {
@@ -314,6 +420,16 @@ ADMIN_PANEL_TEMPLATE = """
     async function sendKnob(machineCode, commandType, knobId) {
       const steps = Number(document.getElementById(knobId).value || "1");
       await sendCommand(machineCode, commandType, { steps });
+    }
+
+    async function clearCommands() {
+      const response = await fetch("/admin/panel/clear-commands", { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok) {
+        alert(payload.error || "Failed to clear commands");
+        return;
+      }
+      await refresh();
     }
 
     refresh();
@@ -530,6 +646,7 @@ def serialize_session(session):
     return {
         "session_id": session.session_id,
         "machine_id": session.machine_id,
+        "machine_code": machine.machine_code if machine else None,
         "status": session.status,
         "expected_amount": decimal_to_str(session.expected_amount),
         "expires_at": to_iso(session.expires_at),
@@ -559,6 +676,16 @@ def serialize_command(command):
         "completed_at": to_iso(command.completed_at),
         "created_at": to_iso(command.created_at),
         "machine_code": machine.machine_code if machine else None,
+    }
+
+
+def serialize_payment(payment):
+    return {
+        "trx_id": payment.trx_id,
+        "machine_code": payment.machine_code,
+        "session_id": payment.session_id,
+        "amount": decimal_to_str(payment.amount),
+        "created_at": to_iso(payment.created_at),
     }
 
 
@@ -765,7 +892,32 @@ def admin_panel_data():
     cleanup_expired_sessions()
     machines = [serialize_machine(row) for row in Machine.query.order_by(Machine.id).all()]
     commands = [serialize_command(row) for row in Command.query.order_by(Command.id.desc()).limit(20).all()]
-    return jsonify({"ok": True, "machines": machines, "commands": commands})
+    sessions = [serialize_session(row) for row in WashSession.query.order_by(WashSession.created_at.desc()).limit(20).all()]
+    payments = [serialize_payment(row) for row in PaymentEvent.query.order_by(PaymentEvent.created_at.desc()).limit(20).all()]
+
+    total_revenue = Decimal("0.00")
+    for payment in PaymentEvent.query.all():
+        total_revenue += Decimal(payment.amount)
+
+    summary = {
+        "total_revenue": decimal_to_str(total_revenue),
+        "completed_sessions": WashSession.query.filter_by(status=SESSION_COMPLETED).count(),
+        "awaiting_payment_sessions": WashSession.query.filter_by(status=SESSION_AWAITING_PAYMENT).count(),
+        "running_sessions": WashSession.query.filter_by(status=SESSION_RUNNING).count(),
+        "machine_count": Machine.query.count(),
+        "payment_count": PaymentEvent.query.count(),
+    }
+
+    return jsonify(
+        {
+            "ok": True,
+            "summary": summary,
+            "machines": machines,
+            "commands": commands,
+            "sessions": sessions,
+            "payments": payments,
+        }
+    )
 
 
 @app.route("/admin/panel/<machine_code>/command", methods=["POST"])
@@ -794,6 +946,17 @@ def admin_panel_command(machine_code):
     )
     db.session.commit()
     return jsonify({"ok": True, "command": serialize_command(command)})
+
+
+@app.route("/admin/panel/clear-commands", methods=["POST"])
+def admin_panel_clear_commands():
+    auth = require_admin_panel_auth()
+    if auth:
+        return auth
+
+    Command.query.delete()
+    db.session.commit()
+    return jsonify({"ok": True})
 
 
 @app.route("/m/<public_token>")
