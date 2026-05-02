@@ -13,7 +13,7 @@ services:
         fromService:
           type: web
           name: washingmachine-web
-          property: host
+          property: url
       - key: DATABASE_URL
         fromDatabase:
           name: washingmachine-db
@@ -24,14 +24,22 @@ services:
         value: -1002522488273
       - key: ABA_BOT_ID
         value: 1148497258
-      - key: LAUNDER_BOT_ID
-        value: 7571687961
       - key: TELEGRAM_BOT_USERNAME
         sync: false
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: ABA_PAY_URL_TEMPLATE
         sync: false
+      - key: ADMIN_PANEL_USERNAME
+        sync: false
+      - key: ADMIN_PANEL_PASSWORD
+        sync: false
+      - key: SESSION_EXPIRE_MINUTES
+        value: 3
+      - key: DEFAULT_WASH_DURATION_MINUTES
+        value: 30
+      - key: MACHINE_OFFLINE_SECONDS
+        value: 45
 
   - type: worker
     name: washingmachine-worker
@@ -66,6 +74,8 @@ services:
       - key: TG_API_ID
         sync: false
       - key: TG_API_HASH
+        sync: false
+      - key: TG_STRING_SESSION
         sync: false
       - key: TG_SESSION_NAME
         value: aba_listener
