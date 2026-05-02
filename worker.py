@@ -36,7 +36,9 @@ ABA_PATTERN = re.compile(
 )
 
 session_source = StringSession(TG_STRING_SESSION) if TG_STRING_SESSION else TG_SESSION_NAME
-client = TelegramClient(session_source, TG_API_ID, TG_API_HASH)
+event_loop = asyncio.new_event_loop()
+asyncio.set_event_loop(event_loop)
+client = TelegramClient(session_source, TG_API_ID, TG_API_HASH, loop=event_loop)
 
 
 def parse_aba_message(text):
