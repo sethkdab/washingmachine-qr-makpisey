@@ -157,6 +157,25 @@ SESSION_TEMPLATE = """
     .timer { font-size: 36px; font-weight: 800; margin: 8px 0; }
     .muted { color: #64748b; }
     .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.68);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .overlay.open { display: flex; }
+    .modal {
+      width: min(520px, 100%);
+      background: white;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 18px 48px rgba(15, 23, 42, 0.25);
+    }
+    .modal h3 { margin-top: 0; }
+    .modal p { line-height: 1.6; }
   </style>
 </head>
 <body>
@@ -174,15 +193,31 @@ SESSION_TEMPLATE = """
       {% if telegram_link %}
       <a class="btn alt" href="{{ telegram_link }}" target="_blank" rel="noopener noreferrer">Connect Telegram</a>
       {% endif %}
-      <a class="btn" href="{{ pay_link }}" target="_blank" rel="noopener noreferrer">Pay with ABA</a>
+      <a class="btn" href="#" id="pay-button">Pay with ABA</a>
+    </div>
+  </div>
+
+  <div class="overlay" id="pay-warning">
+    <div class="modal">
+      <h3>Before You Pay</h3>
+      <p>Please put your clothes inside the washing machine and close the door properly before continuing to ABA payment.</p>
+      <div class="actions">
+        <button class="btn" id="confirm-pay">I Understand</button>
+        <button class="btn alt" id="cancel-pay">Cancel</button>
+      </div>
     </div>
   </div>
 
   <script>
     const sessionId = "{{ session.session_id }}";
+    const payLink = "{{ pay_link }}";
     const statusText = document.getElementById("status-text");
     const timerEl = document.getElementById("timer");
     const detailText = document.getElementById("detail-text");
+    const payButton = document.getElementById("pay-button");
+    const payWarning = document.getElementById("pay-warning");
+    const confirmPay = document.getElementById("confirm-pay");
+    const cancelPay = document.getElementById("cancel-pay");
 
     function formatClock(seconds) {
       if (seconds == null || seconds <= 0) return "00:00";
@@ -221,6 +256,20 @@ SESSION_TEMPLATE = """
         timerEl.textContent = "--:--";
       }
     }
+
+    payButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      payWarning.classList.add("open");
+    });
+
+    cancelPay.addEventListener("click", () => {
+      payWarning.classList.remove("open");
+    });
+
+    confirmPay.addEventListener("click", () => {
+      window.open(payLink, "_blank", "noopener,noreferrer");
+      payWarning.classList.remove("open");
+    });
 
     async function refreshSession() {
       const res = await fetch("/api/session/" + sessionId, { cache: "no-store" });
