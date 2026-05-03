@@ -56,6 +56,7 @@ COMMAND_COMPLETED = "completed"
 
 START_SERVICE = "START_SERVICE"
 POWER_HOLD = "POWER_HOLD"
+START_PAUSE_PRESS = "START_PAUSE_PRESS"
 START_PAUSE_HOLD = "START_PAUSE_HOLD"
 KNOB_CLOCKWISE = "KNOB_CLOCKWISE"
 KNOB_COUNTERCLOCKWISE = "KNOB_COUNTERCLOCKWISE"
@@ -302,6 +303,7 @@ ADMIN_PANEL_TEMPLATE = """
           <div class="actions">
             <button class="ok" onclick="bypassPayment('${machine.machine_code}')">Bypass Payment</button>
             <button class="warn" onclick="sendCommand('${machine.machine_code}', 'POWER_HOLD')">Hold Power 2s</button>
+            <button class="ok" onclick="sendCommand('${machine.machine_code}', 'START_PAUSE_PRESS')">Start 1s</button>
             <button class="ok" onclick="sendCommand('${machine.machine_code}', 'START_PAUSE_HOLD')">Open Door 3s</button>
             <button onclick="sendKnob('${machine.machine_code}', 'KNOB_CLOCKWISE', '${knobId}')">Knob Clockwise</button>
             <button class="alt" onclick="sendKnob('${machine.machine_code}', 'KNOB_COUNTERCLOCKWISE', '${knobId}')">Knob Counterclockwise</button>
@@ -1028,7 +1030,7 @@ def admin_panel_command(machine_code):
     command_type = (data.get("command_type") or "").strip()
     steps = max(1, min(12, int(data.get("steps") or 1)))
 
-    if command_type not in {POWER_HOLD, START_PAUSE_HOLD, KNOB_CLOCKWISE, KNOB_COUNTERCLOCKWISE}:
+    if command_type not in {POWER_HOLD, START_PAUSE_PRESS, START_PAUSE_HOLD, KNOB_CLOCKWISE, KNOB_COUNTERCLOCKWISE}:
         return jsonify({"ok": False, "error": "invalid_command_type"}), 400
 
     command = queue_machine_command(

@@ -229,6 +229,8 @@ void maybeSendFinished() {
 void executeManualCommand(const String& dbCommandId, const String& type, int steps) {
   if (type == "POWER_HOLD") {
     pressButtonFor(POWER_BUTTON_PIN, "power", POWER_HOLD_MS);
+  } else if (type == "START_PAUSE_PRESS") {
+    pressButtonFor(START_PAUSE_BUTTON_PIN, "start/pause", START_PRESS_MS);
   } else if (type == "START_PAUSE_HOLD") {
     pressButtonFor(START_PAUSE_BUTTON_PIN, "start/pause", DOOR_HOLD_MS);
   } else if (type == "KNOB_CLOCKWISE") {
