@@ -63,7 +63,7 @@ KNOB_COUNTERCLOCKWISE = "KNOB_COUNTERCLOCKWISE"
 
 MACHINE_TEMPLATE = """
 <!DOCTYPE html>
-<html lang="en">
+<html lang="km">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -80,11 +80,11 @@ MACHINE_TEMPLATE = """
   <div class="card">
     <div class="status" id="status">{{ initial.status }}</div>
     <h1>{{ machine.name }}</h1>
-    <p class="muted">Machine code: {{ machine.machine_code }}</p>
-    <p><strong>Price:</strong> $<span id="price">{{ initial.price }}</span></p>
+    <p class="muted">លេខម៉ាស៊ីន: {{ machine.machine_code }}</p>
+    <p><strong>តម្លៃ:</strong> $<span id="price">{{ initial.price }}</span></p>
     <p id="message"></p>
     <form id="reserve-form" method="post" action="/api/public/{{ machine.public_token }}/reserve">
-      <button id="reserve-button" class="btn" type="submit">Reserve</button>
+      <button id="reserve-button" class="btn" type="submit">កក់ម៉ាស៊ីន</button>
     </form>
   </div>
 
@@ -107,20 +107,20 @@ MACHINE_TEMPLATE = """
       let showReserve = false;
 
       if (machine.status === "available") {
-        text = "Machine is available. Press Reserve to hold it for " + machine.expire_minutes + " minutes.";
+        text = "ម៉ាស៊ីនទំនេរ។ ចុចកក់ដើម្បីរក្សាទុករយៈពេល " + machine.expire_minutes + " នាទី។";
         showReserve = true;
       } else if (machine.status === "reserved_unpaid") {
-        text = "Temporary reservation active. Payment window left: " + formatClock(machine.reservation_seconds_left) + ".";
+        text = "បានកក់បណ្តោះអាសន្ន។ ពេលវេលាសម្រាប់បង់ប្រាក់នៅសល់: " + formatClock(machine.reservation_seconds_left) + "។";
       } else if (machine.status === "starting") {
-        text = "Payment received. Waiting for ESP32 to acknowledge start.";
+        text = "បានទទួលការទូទាត់។ កំពុងរង់ចាំម៉ាស៊ីនចាប់ផ្តើម។";
       } else if (machine.status === "running") {
-        text = "Machine is running.";
+        text = "ម៉ាស៊ីនកំពុងដំណើរការ។";
       } else if (machine.status === "offline") {
-        text = "Machine is offline.";
+        text = "ម៉ាស៊ីនមិនអនឡាញ។";
       } else if (machine.status === "fault") {
-        text = "Machine is in fault state.";
+        text = "ម៉ាស៊ីនមានបញ្ហា។";
       } else {
-        text = "Machine is busy.";
+        text = "ម៉ាស៊ីនកំពុងជាប់រវល់។";
       }
 
       messageEl.textContent = text;
@@ -143,7 +143,7 @@ MACHINE_TEMPLATE = """
 
 SESSION_TEMPLATE = """
 <!DOCTYPE html>
-<html lang="en">
+<html lang="km">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -182,28 +182,28 @@ SESSION_TEMPLATE = """
   <div class="card">
     <div class="status" id="status-text">{{ initial_message }}</div>
     <div class="timer" id="timer">--:--</div>
-    <p><strong>Session:</strong> {{ session.session_id }}</p>
-    <p><strong>Amount:</strong> ${{ amount }}</p>
-    <p><strong>Expires at:</strong> {{ expires_at }}</p>
-    <p class="muted" id="detail-text">Polling every 3 seconds.</p>
+    <p><strong>លេខសម័យ:</strong> {{ session.session_id }}</p>
+    <p><strong>ចំនួនទឹកប្រាក់:</strong> ${{ amount }}</p>
+    <p><strong>ផុតកំណត់នៅ:</strong> {{ expires_at }}</p>
+    <p class="muted" id="detail-text">កំពុងពិនិត្យស្ថានភាពរៀងរាល់ 3 វិនាទី។</p>
   </div>
 
   <div class="card">
     <div class="actions">
       {% if telegram_link %}
-      <a class="btn alt" href="{{ telegram_link }}" target="_blank" rel="noopener noreferrer">Connect Telegram</a>
+      <a class="btn alt" href="{{ telegram_link }}" target="_blank" rel="noopener noreferrer">ភ្ជាប់ Telegram</a>
       {% endif %}
-      <a class="btn" href="#" id="pay-button">Pay with ABA</a>
+      <a class="btn" href="#" id="pay-button">បង់ប្រាក់តាម ABA</a>
     </div>
   </div>
 
   <div class="overlay" id="pay-warning">
     <div class="modal">
-      <h3>Before You Pay</h3>
-      <p>Please put your clothes inside the washing machine and close the door properly before continuing to ABA payment.</p>
+      <h3>មុនពេលបង់ប្រាក់</h3>
+      <p>សូមដាក់ខោអាវចូលក្នុងម៉ាស៊ីនបោក ហើយបិទទ្វារឲ្យជិតសិន មុននឹងបន្តទៅការទូទាត់ ABA។</p>
       <div class="actions">
-        <button class="btn" id="confirm-pay">I Understand</button>
-        <button class="btn alt" id="cancel-pay">Cancel</button>
+        <button class="btn" id="confirm-pay">ខ្ញុំយល់ហើយ</button>
+        <button class="btn alt" id="cancel-pay">បោះបង់</button>
       </div>
     </div>
   </div>
@@ -228,29 +228,29 @@ SESSION_TEMPLATE = """
 
     function render(session) {
       if (session.status === "awaiting_payment") {
-        statusText.textContent = "Waiting for payment";
+        statusText.textContent = "កំពុងរង់ចាំការទូទាត់";
         timerEl.textContent = formatClock(session.seconds_until_expiry);
-        detailText.textContent = "Complete payment before the reservation expires.";
+        detailText.textContent = "សូមបង់ប្រាក់មុនពេលការកក់ផុតកំណត់។";
       } else if (session.status === "payment_confirmed") {
-        statusText.textContent = "Payment received. Starting machine...";
+        statusText.textContent = "បានទទួលការទូទាត់។ កំពុងចាប់ផ្តើមម៉ាស៊ីន...";
         timerEl.textContent = "READY";
-        detailText.textContent = "Backend sent the start command. Waiting for ESP32 ACK.";
+        detailText.textContent = "ប្រព័ន្ធបានផ្ញើបញ្ជាចាប់ផ្តើមហើយ កំពុងរង់ចាំម៉ាស៊ីនឆ្លើយតប។";
       } else if (session.status === "running") {
-        statusText.textContent = "Machine is running";
+        statusText.textContent = "ម៉ាស៊ីនកំពុងដំណើរការ";
         timerEl.textContent = formatClock(session.remaining_seconds);
-        detailText.textContent = "The ESP32 acknowledged the command and the wash is active.";
+        detailText.textContent = "ម៉ាស៊ីនបានទទួលបញ្ជា ហើយការបោកគក់កំពុងដំណើរការ។";
       } else if (session.status === "completed") {
-        statusText.textContent = "Wash complete";
+        statusText.textContent = "បោកគក់រួចរាល់";
         timerEl.textContent = "DONE";
-        detailText.textContent = "The machine reported the cycle as finished.";
+        detailText.textContent = "ម៉ាស៊ីនបានរាយការណ៍ថាបានបញ្ចប់វដ្តបោកគក់ហើយ។";
       } else if (session.status === "expired") {
-        statusText.textContent = "Reservation expired";
+        statusText.textContent = "ការកក់ផុតកំណត់";
         timerEl.textContent = "00:00";
-        detailText.textContent = "The unpaid reservation timed out.";
+        detailText.textContent = "ការកក់ដែលមិនទាន់បង់ប្រាក់បានផុតកំណត់។";
       } else if (session.status === "cancelled") {
-        statusText.textContent = "Reservation cancelled";
+        statusText.textContent = "ការកក់ត្រូវបានបោះបង់";
         timerEl.textContent = "00:00";
-        detailText.textContent = "The reservation was cancelled.";
+        detailText.textContent = "ការកក់ត្រូវបានបោះបង់។";
       } else {
         statusText.textContent = session.status;
         timerEl.textContent = "--:--";
@@ -267,7 +267,7 @@ SESSION_TEMPLATE = """
     });
 
     confirmPay.addEventListener("click", () => {
-      window.open(payLink, "_blank", "noopener,noreferrer");
+      window.location.href = payLink;
       payWarning.classList.remove("open");
     });
 
@@ -1233,12 +1233,12 @@ def session_page(session_id):
     session = WashSession.query.filter_by(session_id=session_id).first_or_404()
     machine = db.session.get(Machine, session.machine_id)
     status_messages = {
-        SESSION_AWAITING_PAYMENT: "Waiting for payment",
-        SESSION_PAYMENT_CONFIRMED: "Payment received. Starting machine...",
-        SESSION_RUNNING: "Machine is running",
-        SESSION_COMPLETED: "Wash complete",
-        SESSION_EXPIRED: "Reservation expired",
-        SESSION_CANCELLED: "Reservation cancelled",
+        SESSION_AWAITING_PAYMENT: "កំពុងរង់ចាំការទូទាត់",
+        SESSION_PAYMENT_CONFIRMED: "បានទទួលការទូទាត់។ កំពុងចាប់ផ្តើមម៉ាស៊ីន...",
+        SESSION_RUNNING: "ម៉ាស៊ីនកំពុងដំណើរការ",
+        SESSION_COMPLETED: "បោកគក់រួចរាល់",
+        SESSION_EXPIRED: "ការកក់ផុតកំណត់",
+        SESSION_CANCELLED: "ការកក់ត្រូវបានបោះបង់",
     }
     return render_template_string(
         SESSION_TEMPLATE,
