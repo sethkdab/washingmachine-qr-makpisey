@@ -9,13 +9,15 @@ const char* BASE_URL = "http://192.168.100.88:5000";
 const char* MACHINE_CODE = "WM-01";
 const char* MACHINE_TOKEN = "dev_96e266255cac4f55";
 
-const int POWER_BUTTON_PIN = 8;
-const int START_PAUSE_BUTTON_PIN = 10;
-const int KNOB_PIN_1 = 11;
-const int KNOB_PIN_2 = 12;
+const int POWER_BUTTON_PIN = 2;
+const int START_PAUSE_BUTTON_PIN = 1;
+const int KNOB_PIN_1 = 4;
+const int KNOB_PIN_2 = 3;
 
 const bool BUTTON_IDLE_HIGH = true;
-const unsigned long BUTTON_HOLD_MS = 2000;
+const unsigned long POWER_HOLD_MS = 2000;
+const unsigned long START_PRESS_MS = 1000;
+const unsigned long DOOR_HOLD_MS = 3000;
 const unsigned long BUTTON_SETTLE_MS = 250;
 const unsigned long KNOB_STEP_DELAY_MS = 120;
 
@@ -40,10 +42,10 @@ void setButtonIdle(int pin) {
   digitalWrite(pin, BUTTON_IDLE_HIGH ? HIGH : LOW);
 }
 
-void pressButtonHold(int pin, const char* label) {
-  Serial.printf("[control] Holding %s button for %lu ms\n", label, BUTTON_HOLD_MS);
+void pressButtonFor(int pin, const char* label, unsigned long holdMs) {
+  Serial.printf("[control] Holding %s button for %lu ms\n", label, holdMs);
   digitalWrite(pin, BUTTON_IDLE_HIGH ? LOW : HIGH);
-  delay(BUTTON_HOLD_MS);
+  delay(holdMs);
   setButtonIdle(pin);
   delay(BUTTON_SETTLE_MS);
 }
@@ -185,9 +187,10 @@ void startMachineRun(const String& dbCommandId, const String& sessionId, int dur
     ? OVERRIDE_RUN_DURATION_MS
     : (unsigned long) durationMinutes * 60UL * 1000UL;
 
-  pressButtonHold(START_PAUSE_BUTTON_PIN, "start/pause");
+  pressButtonFor(POWER_BUTTON_PIN, "power", POWER_HOLD_MS);
+  pressButtonFor(START_PAUSE_BUTTON_PIN, "start/pause", START_PRESS_MS);
 
-  Serial.println("[machine] Start/Pause button sent for paid wash session");
+  Serial.println("[machine] Paid wash start sequence sent: power hold then start press");
   Serial.printf("[machine] session=%s command=%s durationMs=%lu\n", activeSessionId.c_str(), activeCommandId.c_str(), runDurationMs);
 }
 
@@ -225,9 +228,9 @@ void maybeSendFinished() {
 
 void executeManualCommand(const String& dbCommandId, const String& type, int steps) {
   if (type == "POWER_HOLD") {
-    pressButtonHold(POWER_BUTTON_PIN, "power");
+    pressButtonFor(POWER_BUTTON_PIN, "power", POWER_HOLD_MS);
   } else if (type == "START_PAUSE_HOLD") {
-    pressButtonHold(START_PAUSE_BUTTON_PIN, "start/pause");
+    pressButtonFor(START_PAUSE_BUTTON_PIN, "start/pause", DOOR_HOLD_MS);
   } else if (type == "KNOB_CLOCKWISE") {
     for (int i = 0; i < steps; i++) {
       knobClockwiseStep();

@@ -302,7 +302,7 @@ ADMIN_PANEL_TEMPLATE = """
           <div class="actions">
             <button class="ok" onclick="bypassPayment('${machine.machine_code}')">Bypass Payment</button>
             <button class="warn" onclick="sendCommand('${machine.machine_code}', 'POWER_HOLD')">Hold Power 2s</button>
-            <button class="ok" onclick="sendCommand('${machine.machine_code}', 'START_PAUSE_HOLD')">Hold Start/Pause 2s</button>
+            <button class="ok" onclick="sendCommand('${machine.machine_code}', 'START_PAUSE_HOLD')">Open Door 3s</button>
             <button onclick="sendKnob('${machine.machine_code}', 'KNOB_CLOCKWISE', '${knobId}')">Knob Clockwise</button>
             <button class="alt" onclick="sendKnob('${machine.machine_code}', 'KNOB_COUNTERCLOCKWISE', '${knobId}')">Knob Counterclockwise</button>
             <label>Steps <input id="${knobId}" type="number" min="1" max="12" value="1" /></label>
